@@ -2,6 +2,10 @@
 
 一个充满视觉惊喜的、可高度自定义的网页版随机点名工具。
 
+<img width="1336" height="939" alt="image" src="https://github.com/user-attachments/assets/4c2251f0-6e3c-4025-8a31-b7d9712618be" />
+<img width="1335" height="940" alt="image" src="https://github.com/user-attachments/assets/111f0f8c-9684-4754-938f-9d523906787b" />
+
+
 ## 主要功能
 
 - **动态视觉效果**: 唯美的动态星空背景，搭配流星、烟花等多种动画，让点名过程充满仪式感。
