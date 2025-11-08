@@ -60,7 +60,7 @@ const studentDataString = `
 
     如果您不想修改 `names.js` 文件，或者想临时使用一份不同的名单，也非常简单。
 
-    1.  确保 `names.js` 文件中的 `const studentDataString = ``;` 这一行，两个反引号 `` ` `` 之间没有内容。
+    1.  确保 `names.js` 文件不存在，或其中的 `const studentDataString = ``;` 这一行，两个反引号 `` ` `` 之间没有内容。
     2.  用浏览器打开 `index.html`。
     3.  程序会自动弹出一个文件选择框，此时选择一个包含名单的 `.txt` 文件即可。
     4.  **注意**：上传的 `.txt` 文件同样支持方式A中列出的所有灵活格式。
