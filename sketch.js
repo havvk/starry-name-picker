@@ -7,7 +7,7 @@ let activeAnimators = []; // Can handle multiple rising names
 let pendingAnimationTimeouts = []; // Tracks timeouts for animations about to start
 
 // --- Animation objects ---
-let fireworkRocket = null;
+let fireworkRockets = [];
 let passingMeteors = [];
 
 // --- Hall of Fame layout control ---
@@ -17,12 +17,20 @@ let rotationAngle = 0;
 let scaleFactor = 1.0;
 let targetScale = 1.0;
 
+// --- Group Settings ---
+let groupSize = 1; // Default to individual mode
+let studentGroups = [];
+let availableGroups = [];
+let targetGroup = null;
+
+
 let students = []; // Initialize as empty
-let availableStudents = [];
-let targetName = '';
 
 let startButton, hallOfFameContainer, uiContainer, sidebar, sidebarTrigger, sidebarNameList, copyButton;
 let fileInput, promptText, customUploadButton; // Consolidated declaration
+let groupModeSwitcher, groupModeLabel, toastContainer; // New UI elements
+
+const maxGroupSize = 4; // Max number of people per group
 
 let gameState = 'IDLE';
 
@@ -43,6 +51,9 @@ function setup() {
   sidebarTrigger = select('#sidebar-trigger');
   sidebarNameList = select('#sidebar-namelist');
   copyButton = select('#copy-button');
+  groupModeSwitcher = select('#group-mode-switcher');
+  groupModeLabel = select('#group-mode-label');
+  toastContainer = select('#toast-container');
 
   // Add event listeners
   sidebarTrigger.mousePressed((e) => { e.stopPropagation(); sidebar.toggleClass('is-open'); });
@@ -50,6 +61,7 @@ function setup() {
   canvas.mousePressed(() => { if (sidebar.hasClass('is-open')) { sidebar.removeClass('is-open'); } });
   startButton.mousePressed(startPicking);
   copyButton.mousePressed(copyNamesToClipboard);
+  groupModeSwitcher.mousePressed(handleModeSwitch);
 
   // Start the name loading and initialization process
   loadStudentsAndInit();
@@ -78,84 +90,65 @@ function draw() {
   }
   pop();
 
-  if (fireworkRocket) {
-    fireworkRocket.update();
-    fireworkRocket.draw();
-    if (fireworkRocket.isDone()) {
-      gameState = 'RESULT';
-      const explosionPos = fireworkRocket.target.copy();
-      fireworks.push(new Firework(explosionPos.x, explosionPos.y, fireworkRocket.color));
-      
-      // Format display name based on whether an ID exists
-      const displayName = targetName.id 
-        ? `${targetName.name}<br><span style="font-size: 0.4em; opacity: 0.7;">${targetName.id}</span>` 
-        : targetName.name;
-      const risingNameElement = createDiv(displayName);
+  if (fireworkRockets.length > 0) {
+    let allRocketsDone = true;
+    for (let i = fireworkRockets.length - 1; i >= 0; i--) {
+      const rocket = fireworkRockets[i];
+      rocket.update();
+      rocket.draw();
+      if (rocket.isDone()) {
+        // This rocket has reached its target, let's create the explosion and name animation
+        gameState = 'RESULT';
+        const explosionPos = rocket.target.copy();
+        fireworks.push(new Firework(explosionPos.x, explosionPos.y, rocket.color));
+        
+        const student = rocket.student;
+        const displayName = student.id 
+          ? `<span class="hof-name">${student.name}</span><span class="hof-id">${student.id}</span>` 
+          : student.name;
+        const risingNameElement = createDiv(displayName);
 
-      risingNameElement.parent(uiContainer);
-      risingNameElement.style('position', 'absolute');
-      risingNameElement.style('font-size', '64px');
-      risingNameElement.style('line-height', '0.9'); // Reduce line height for tighter grouping
-      risingNameElement.style('font-weight', 'bold');
-      risingNameElement.style('color', '#fff');
-      risingNameElement.style('text-shadow', '0 0 15px #fff, 0 0 25px #fff, 0 0 50px #00aaff');
-      risingNameElement.style('z-index', '10');
-      risingNameElement.style('animation', 'breathing-glow 2.5s ease-in-out infinite');
-      risingNameElement.style('left', `${explosionPos.x}px`);
-      risingNameElement.style('top', `${explosionPos.y}px`);
-      risingNameElement.style('transform', 'translate(-50%, -50%)');
-      risingNameElement.style('user-select', 'none');
+        risingNameElement.parent(uiContainer);
+        risingNameElement.style('position', 'absolute');
+        risingNameElement.style('font-size', '64px');
+        risingNameElement.style('font-weight', 'bold');
+        risingNameElement.style('color', '#fff');
+        risingNameElement.style('text-shadow', '0 0 15px #fff, 0 0 25px #fff, 0 0 50px #00aaff');
+        risingNameElement.style('z-index', '10');
+        risingNameElement.style('animation', 'breathing-glow 2.5s ease-in-out infinite');
+        risingNameElement.style('left', `${explosionPos.x}px`);
+        risingNameElement.style('top', `${explosionPos.y}px`);
+        risingNameElement.style('transform', 'translate(-50%, 0)');
+        risingNameElement.style('user-select', 'none');
 
-      const currentTargetName = targetName;
-      fireworkRocket = null;
-      
-      if (availableStudents.length > 0) {
-        gameState = 'IDLE';
-        startButton.html('继续点名');
-        startButton.style('display', 'block');
+        // Schedule the name to rise to the Hall of Fame
+        const pendingAnimation = { element: risingNameElement };
+        const timeoutId = setTimeout(() => {
+          const myIndex = pendingAnimationTimeouts.findIndex(p => p.id === timeoutId);
+          if (myIndex > -1) pendingAnimationTimeouts.splice(myIndex, 1);
+
+          const animator = new NameAnimator(risingNameElement, explosionPos, createVector(0, 0), 22); // End position is now dynamic
+          animator.student = student;
+          animator.group = rocket.group;
+          activeAnimators.push(animator);
+        }, 2500);
+
+        pendingAnimation.id = timeoutId;
+        pendingAnimationTimeouts.push(pendingAnimation);
+
+        // Remove the rocket that has finished
+        fireworkRockets.splice(i, 1);
+      } else {
+        allRocketsDone = false;
       }
-
-      const pendingAnimation = { element: risingNameElement };
-      const timeoutId = setTimeout(() => {
-        const myIndex = pendingAnimationTimeouts.findIndex(p => p.id === timeoutId);
-        if (myIndex > -1) {
-          pendingAnimationTimeouts.splice(myIndex, 1);
+    }
+    
+    if (fireworkRockets.length === 0) {
+        if (availableGroups.length > 0) {
+            gameState = 'IDLE';
+            startButton.html('继续点名');
+            startButton.removeClass('is-hidden');
         }
-
-        const slotIndex = nextHallOfFameSlot;
-        nextHallOfFameSlot++;
-
-        const namesPerRow = 7;
-        const rowSpacing = 60; // Increased from 40 for better spacing
-
-        const row = Math.floor(slotIndex / namesPerRow);
-        const indexInRow = slotIndex % namesPerRow;
-
-        const targetY = 50 + row * rowSpacing;
-
-        const baseOffsetPercent = 10;
-        let horizontalOffsetPercent = 0;
-        if (indexInRow > 0) {
-          if (indexInRow % 2 === 1) {
-            horizontalOffsetPercent = -(Math.floor(indexInRow / 2) + 1) * baseOffsetPercent;
-          } else {
-            horizontalOffsetPercent = (indexInRow / 2) * baseOffsetPercent;
-          }
-        }
-        
-        const targetLeftPercent = 50 + horizontalOffsetPercent;
-        const targetX = width * (targetLeftPercent / 100);
-        
-        const endPos = createVector(targetX, targetY);
-
-        const animator = new NameAnimator(risingNameElement, explosionPos, endPos, 22);
-        animator.targetLeftPercent = targetLeftPercent;
-        animator.name = currentTargetName;
-        activeAnimators.push(animator);
-      }, 2500);
-
-      pendingAnimation.id = timeoutId;
-      pendingAnimationTimeouts.push(pendingAnimation);
     }
   }
 
@@ -167,34 +160,113 @@ function draw() {
     }
   }
 
+  // --- Handle name animations and grouping in Hall of Fame ---
   for (let i = activeAnimators.length - 1; i >= 0; i--) {
     const animator = activeAnimators[i];
+    if (!animator.isPositioned) {
+        // This is the first update, let's calculate its final position in the group
+        const slotIndex = animator.group.hallOfFameSlot;
+        const groupsPerRow = 9;
+        
+        // Dynamically calculate vertical spacing based on group size
+        const heightPerPerson = 46; // Estimated height for one person (name + id)
+        const groupLabelHeight = (groupSize > 1) ? 24 : 0; // Height of the 'Group X' label
+        const rowBuffer = 40; // Extra vertical space between rows
+        const groupSpacing = (groupSize * heightPerPerson) + groupLabelHeight + rowBuffer;
+
+        const row = Math.floor(slotIndex / groupsPerRow);
+        const indexInRow = slotIndex % groupsPerRow;
+
+        const startY = 40; // 40px margin from the top of the screen
+        const targetY = startY + row * groupSpacing;
+
+        const baseOffsetPercent = 11;
+        let horizontalOffsetPercent = 0;
+        if (indexInRow > 0) {
+            if (indexInRow % 2 === 1) {
+                horizontalOffsetPercent = -(Math.floor(indexInRow / 2) + 1) * baseOffsetPercent;
+            } else {
+                horizontalOffsetPercent = (indexInRow / 2) * baseOffsetPercent;
+            }
+        }
+        
+        const targetLeftPercent = 50 + horizontalOffsetPercent;
+        const targetX = width * (targetLeftPercent / 100);
+
+        animator.endPos = createVector(targetX, targetY);
+        animator.targetLeftPercent = targetLeftPercent;
+        animator.isPositioned = true;
+    }
+
     animator.update();
+
     if (animator.isDone()) {
-      const el = animator.element;
-      
-      el.style('transform', '');
-      el.style('animation', '');
-      el.style('left', `${animator.targetLeftPercent}%`);
-      el.style('top', `${animator.endPos.y}px`);
-      el.style('font-size', `${animator.endSize}px`);
-      el.class('risen-name');
-      el.style('user-select', 'none');
-      
-      const student = animator.name; // animator.name now holds the student object
-      hallOfFame.push({ student: student, element: el });
+      const finishedAnimator = activeAnimators.splice(i, 1)[0];
+      const { student, group, element } = finishedAnimator;
 
-      const sidebarDisplayName = student.id ? `${student.name} (${student.id})` : student.name;
-      const sidebarLi = createElement('li', sidebarDisplayName);
-      sidebarLi.parent(sidebarNameList);
-      sidebarLi.style('animation-delay', `${random(-3)}s`); // Add random delay for breathing effect
+      // Add student to the picked list, which now tracks groups
+      let existingEntry = hallOfFame.find(entry => entry.group.id === group.id);
+      if (!existingEntry) {
+        existingEntry = { group: group, studentElements: [], isComplete: false };
+        hallOfFame.push(existingEntry);
+      }
+      existingEntry.studentElements.push({ student, element });
 
-      activeAnimators.splice(i, 1);
+      // Check if the group is now complete
+      if (existingEntry.studentElements.length === group.members.length) {
+        existingEntry.isComplete = true;
+        // nextHallOfFameSlot is now incremented in startPicking() to prevent race conditions
+        
+        // --- Create the final group container in the Hall of Fame ---
+        const groupContainer = createDiv('');
+        groupContainer.parent(hallOfFameContainer);
+        groupContainer.class('hof-group-container');
+        groupContainer.style('left', `${finishedAnimator.targetLeftPercent}%`);
+        groupContainer.style('top', `${finishedAnimator.endPos.y}px`);
+        
+        if (groupSize > 1) {
+          const groupLabel = createDiv(`第 ${group.hallOfFameSlot + 1} 组`);
+          groupLabel.class('hof-group-label');
+          groupLabel.parent(groupContainer);
+        }
 
-      if (availableStudents.length === 0 && activeAnimators.length === 0 && pendingAnimationTimeouts.length === 0) {
-        gameState = 'IDLE'; // Set state to IDLE so the button is responsive
+        const membersContainer = createDiv('');
+        membersContainer.class('hof-members-container');
+        membersContainer.parent(groupContainer);
+
+        // Move the individual name elements into the final container
+        for (const item of existingEntry.studentElements) {
+          item.element.remove(); // Remove from the top-level ui-container
+          const memberElement = createDiv(item.element.html()); // Re-create to move it
+          memberElement.class('hof-group-member');
+          memberElement.parent(membersContainer);
+        }
+        existingEntry.finalElement = groupContainer;
+
+        // --- Update Sidebar ---
+        const sidebarGroupContainer = createElement('li');
+        sidebarGroupContainer.addClass('sidebar-group-container');
+        if (groupSize > 1) {
+          const sidebarGroupLabel = createDiv(`第 ${group.hallOfFameSlot + 1} 组`);
+          sidebarGroupLabel.addClass('sidebar-group-label');
+          sidebarGroupLabel.parent(sidebarGroupContainer);
+        }
+        const sidebarMemberList = createElement('ul');
+        sidebarMemberList.parent(sidebarGroupContainer);
+
+        for (const member of group.members) {
+            const sidebarDisplayName = member.id ? `${member.name} (${member.id})` : member.name;
+            const sidebarLi = createElement('li', sidebarDisplayName);
+            sidebarLi.parent(sidebarMemberList);
+        }
+        sidebarGroupContainer.parent(sidebarNameList);
+      }
+
+      // Check if all students have been picked
+      if (availableGroups.length === 0 && activeAnimators.length === 0 && pendingAnimationTimeouts.length === 0) {
+        gameState = 'IDLE';
         startButton.html('重新开始');
-        startButton.style('display', 'block');
+        startButton.removeClass('is-hidden');
       }
     }
   }
@@ -202,6 +274,8 @@ function draw() {
   if (gameState !== 'ANIMATING' && activeAnimators.length === 0) {
     scaleFactor = lerp(scaleFactor, 1.0, 0.05);
   }
+
+
 
   for (let i = fireworks.length - 1; i >= 0; i--) {
     fireworks[i].update();
@@ -226,7 +300,7 @@ function loadStudentsAndInit() {
                 const newStudentData = parseStudentData(lines);
   
                 if (newStudentData.length > 0) {
-                  initializeApp(newStudentData, 'names.js');
+                  initializeApp(newStudentData, 'names.js', false);
                 } else {
                   // The file has content, but it couldn't be parsed
                   console.log('`names.js` content is invalid. Prompting for file upload.');
@@ -249,7 +323,8 @@ function loadStudentsAndInit() {
 }
 
 function promptForFile() {
-  startButton.hide();
+  startButton.addClass('is-hidden');
+  groupModeSwitcher.addClass('is-hidden');
   const modalOverlay = select('#modal-overlay');
   const modalContent = select('#modal-content');
   
@@ -321,58 +396,198 @@ function handleFile(file) {
     console.log('Successfully loaded student data:', newStudentData);
     modalOverlay.hide();
     // Pass the array of objects to initializeApp
-    initializeApp(newStudentData, file.name);
+    initializeApp(newStudentData, file.name, false);
   } else {
     modalText.html('文件为空或格式不正确，请重新选择。');
   }
 }
 
-function initializeApp(names, source) {
-  // --- Display Professional Toast Notification ---
-  let oldToast = select('.toast-notification');
-  if (oldToast) {
-    oldToast.remove(); // Remove any existing toast immediately
+function initializeApp(names, source, isSwitchingMode = false) {
+  students = [...names];
+  
+  // --- Grouping and UI Initialization ---
+  // Reset everything before creating new groups
+  if (hallOfFame.length > 0) {
+    for(const entry of hallOfFame) {
+        if(entry.finalElement) entry.finalElement.remove();
+    }
+    hallOfFame = [];
+    nextHallOfFameSlot = 0;
+    sidebarNameList.html('');
   }
 
-  // 1. Create the toast element
-  const toast = createDiv('');
-  toast.addClass('toast-notification');
-  
-  // 2. Create icon and text
-  const iconSVG = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/></svg>';
-  const message = createP(`成功从 ${source} 加载了 ${names.length} 位成员。`);
-  message.style('margin', '0');
-  
-  toast.html(iconSVG); // Add icon
-  message.parent(toast); // Add text next to icon
-
-  // 3. Animate it in
-  setTimeout(() => {
-    toast.addClass('visible');
-  }, 50); // Short delay to allow the element to be in the DOM before transitioning
-
-  // 4. Animate it out and remove
-  setTimeout(() => {
-    toast.removeClass('visible');
-    // Remove from DOM after transition ends
-    setTimeout(() => toast.remove(), 600); // 600ms > 0.5s transition duration
-  }, 3500); // Keep on screen for 3.5 seconds
-
-  // --- Existing initialization logic ---
-  students = [...names];
-  availableStudents = [...students];
+  createGroups();
+  updateGroupModeSwitcher(); // Update visuals for the first time
 
   nameParticles = [];
   for (const student of students) { nameParticles.push(new NameParticle(student)); }
   
-  for(const entry of hallOfFame) { entry.element.remove(); }
-  hallOfFame = [];
-  nextHallOfFameSlot = 0;
-  sidebarNameList.html('');
-
   startButton.html('开始点名');
-  startButton.show();
+  startButton.removeClass('is-hidden');
+  groupModeSwitcher.removeClass('is-hidden');
   gameState = 'IDLE';
+
+  if (!isSwitchingMode) {
+    showToast(`成功从 ${source} 加载了 ${names.length} 位成员。`);
+  }
+}
+
+function showToast(message) {
+  // Immediately remove any existing toasts to prevent overlap
+  const existingToasts = selectAll('.toast-notification');
+  for (const t of existingToasts) {
+    t.remove();
+  }
+
+  const toast = createDiv('');
+  toast.parent(toastContainer);
+  toast.addClass('toast-notification');
+  
+  const iconSVG = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/></svg>';
+  const p = createP(message);
+  p.style('margin', '0');
+  
+  toast.html(iconSVG);
+  p.parent(toast);
+
+  setTimeout(() => toast.addClass('visible'), 50);
+  setTimeout(() => {
+    toast.removeClass('visible');
+    setTimeout(() => toast.remove(), 500);
+  }, 3500);
+}
+
+function createGroups() {
+  studentGroups = [];
+  availableGroups = [];
+  
+  let shuffledStudents = [...students];
+  // Fisher-Yates shuffle for randomness
+  for (let i = shuffledStudents.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledStudents[i], shuffledStudents[j]] = [shuffledStudents[j], shuffledStudents[i]];
+  }
+
+  if (groupSize > 1) {
+    let groupIdCounter = 1;
+    for (let i = 0; i < shuffledStudents.length; i += groupSize) {
+      const groupMembers = shuffledStudents.slice(i, i + groupSize);
+      if (groupMembers.length > 0) {
+        studentGroups.push({
+          id: groupIdCounter++,
+          members: groupMembers
+        });
+      }
+    }
+  } else {
+    // If groupSize is 1, each student is their own group
+    shuffledStudents.forEach((student, index) => {
+      studentGroups.push({
+        id: index + 1, // In single mode, group id is just the student's index
+        members: [student]
+      });
+    });
+  }
+  availableGroups = [...studentGroups];
+  console.log(`Created ${studentGroups.length} groups of size up to ${groupSize}.`);
+}
+
+function handleModeSwitch() {
+  if (students.length === 0 || gameState !== 'IDLE') return;
+
+  groupSize++;
+  if (groupSize > maxGroupSize) {
+    groupSize = 1;
+  }
+
+  // Re-create groups and update the switcher visuals instantly
+  createGroups();
+  updateGroupModeSwitcher();
+  
+  // Since the state is reset, clear the hall of fame
+  if (hallOfFame.length > 0) {
+    for(const entry of hallOfFame) {
+        if(entry.finalElement) entry.finalElement.remove();
+    }
+    hallOfFame = [];
+    nextHallOfFameSlot = 0;
+    sidebarNameList.html('');
+  }
+  availableGroups = [...studentGroups];
+}
+
+function updateGroupModeSwitcher() {
+  groupModeSwitcher.html(''); // Clear previous stars and connectors
+  const label = createDiv('');
+  label.id('group-mode-label');
+  label.parent(groupModeSwitcher);
+
+  const starPositions = [];
+  const center = { x: 240, y: 180 }; // Center of the 480x400 container
+  const radius = 170; // Increased radius for the larger container
+
+  let modeText = '';
+  switch (groupSize) {
+    case 1:
+      starPositions.push({ x: center.x, y: center.y });
+      modeText = `单人模式`;
+      break;
+    case 2:
+      starPositions.push({ x: center.x - radius / 1.5, y: center.y });
+      starPositions.push({ x: center.x + radius / 1.5, y: center.y });
+      modeText = `2人/组`;
+      break;
+    case 3:
+      for (let i = 0; i < 3; i++) {
+        const angle = -PI / 2 + (TWO_PI / 3) * i;
+        starPositions.push({ x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius });
+      }
+      modeText = `3人/组`;
+      break;
+    case 4:
+      for (let i = 0; i < 4; i++) {
+        const angle = -PI / 4 + (TWO_PI / 4) * i;
+        starPositions.push({ x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius });
+      }
+      modeText = `4人/组`;
+      break;
+  }
+  label.html(modeText);
+
+  // Create stars
+  starPositions.forEach(pos => {
+    const star = createDiv('');
+    star.class('glowing-star');
+    star.parent(groupModeSwitcher);
+    star.style('left', `${pos.x - 5}px`);
+    star.style('top', `${pos.y - 5}px`);
+    const randomDelay = -random(12); // Use negative delay to start animation at a random point in the cycle
+    star.style('animation-delay', `${randomDelay}s`);
+  });
+
+  // Create connectors
+  if (groupSize > 1) {
+    for (let i = 0; i < starPositions.length; i++) {
+      const p1 = starPositions[i];
+      const p2 = starPositions[(i + 1) % starPositions.length]; // Connect to the next star, wrapping around
+      
+      if (groupSize === 2 && i > 0) continue; // For size 2, only one connector
+
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const dist = sqrt(dx * dx + dy * dy);
+      const angle = atan2(dy, dx);
+
+      const connector = createDiv('');
+      connector.class('star-connector');
+      connector.parent(groupModeSwitcher);
+      connector.style('width', `${dist}px`);
+      connector.style('left', `${p1.x}px`);
+      connector.style('top', `${p1.y}px`);
+      connector.style('transform', `rotate(${degrees(angle)}deg)`);
+      setTimeout(() => connector.style('opacity', 0.7), 10); // Fade in
+    }
+  }
 }
 
 function windowResized() {
@@ -393,58 +608,75 @@ function startPicking() {
     sidebar.removeClass('is-open');
   }
 
-  rotationAngle = 0;
-  scaleFactor = 1.0;
-  for (const p of nameParticles) {
-    p.resetPosition();
-  }
-  if (availableStudents.length === 0) {
+  if (availableGroups.length === 0) {
+    // Reset logic
     for(const entry of hallOfFame) {
-        entry.element.remove();
+        if(entry.finalElement) entry.finalElement.remove();
     }
     hallOfFame = [];
     nextHallOfFameSlot = 0;
     sidebarNameList.html('');
-
-    for (const animator of activeAnimators) {
-      animator.element.remove();
-    }
-    activeAnimators = [];
-
-    for (const pending of pendingAnimationTimeouts) {
-      clearTimeout(pending.id);
-      pending.element.remove();
-    }
-    pendingAnimationTimeouts = [];
-
-    availableStudents = [...students];
+    availableGroups = [...studentGroups];
   }
-  const pickedIndex = floor(random(availableStudents.length));
-  targetName = availableStudents[pickedIndex];
-  availableStudents.splice(pickedIndex, 1);
+
+  const pickedGroupIndex = floor(random(availableGroups.length));
+  targetGroup = availableGroups[pickedGroupIndex];
+  
+  // Reserve a slot in the Hall of Fame for this group immediately
+  targetGroup.hallOfFameSlot = nextHallOfFameSlot;
+  nextHallOfFameSlot++;
+
+  availableGroups.splice(pickedGroupIndex, 1);
+  
   gameState = 'ANIMATING';
   targetScale = 1.8;
   
-  const randomY = random(height * 0.4, height * 0.6);
-  const explosionPos = createVector(width / 2, randomY);
+  // --- Create multiple converging rockets for the group ---
+  const centralExplosionY = random(height * 0.4, height * 0.6);
+  const numMembers = targetGroup.members.length;
+  const spread = width * 0.2;
 
-  const upcomingColor = random(fireworkColors);
-  fireworkRocket = new FireworkRocket(explosionPos, upcomingColor);
+  for (let i = 0; i < numMembers; i++) {
+    const student = targetGroup.members[i];
+    const offsetX = (i - (numMembers - 1) / 2) * (spread / numMembers);
+    const explosionPos = createVector(width / 2 + offsetX, centralExplosionY);
+    const upcomingColor = random(fireworkColors);
+    
+    const rocket = new FireworkRocket(explosionPos, upcomingColor);
+    rocket.student = student;
+    rocket.group = targetGroup;
+    fireworkRockets.push(rocket);
+  }
 
-  startButton.style('display', 'none');
+  // Fade out UI and disable clicks
+  startButton.addClass('is-hidden');
+  groupModeSwitcher.addClass('is-hidden');
 }
 
 function copyNamesToClipboard() {
-  const textToCopy = hallOfFame.map(entry => {
-    if (entry.student && entry.student.id) {
-      return `${entry.student.name}\t${entry.student.id}`;
-    } else if (entry.student) {
-      return entry.student.name;
-    }
-    return ''; // Should not happen, but as a fallback
-  }).join('\n');
+  let textToCopy = '';
+  // Sort hall of fame by group ID to ensure consistent order
+  const sortedFame = [...hallOfFame].sort((a, b) => a.group.hallOfFameSlot - b.group.hallOfFameSlot);
 
-  navigator.clipboard.writeText(textToCopy).then(() => {
+  for (const entry of sortedFame) {
+    if (entry.isComplete) {
+      if (groupSize > 1) {
+        textToCopy += `--- 第 ${entry.group.hallOfFameSlot + 1} 组 ---\n`;
+      }
+      for (const { student } of entry.studentElements) {
+        if (student && student.id) {
+          textToCopy += `${student.name}\t${student.id}\n`;
+        } else if (student) {
+          textToCopy += `${student.name}\n`;
+        }
+      }
+      if (groupSize > 1) {
+        textToCopy += '\n';
+      }
+    }
+  }
+
+  navigator.clipboard.writeText(textToCopy.trim()).then(() => {
     copyButton.html('已复制!');
     setTimeout(() => {
       copyButton.html('复制名单');
@@ -464,12 +696,17 @@ class NameAnimator {
     this.startTime = millis();
     this.duration = 2500;
     this.done = false;
+    this.isPositioned = false; // New flag
+    this.student = null; // Will hold the student object
+    this.group = null; // Will hold the group object
   }
 
   update() {
+    if (!this.isPositioned) return; // Don't update until the final position is set
+
     const elapsedTime = millis() - this.startTime;
     let t = constrain(elapsedTime / this.duration, 0, 1);
-    let easedT = t * t;
+    let easedT = t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2; // Ease in-out quad
 
     if (t < 1) {
       const startX = 0, startY = 0;
@@ -480,7 +717,7 @@ class NameAnimator {
 
       const currentSize = lerp(this.startSize, this.endSize, easedT);
       
-      this.element.style('transform', `translate(-50%, -50%) translate(${currentX}px, ${currentY}px)`);
+      this.element.style('transform', `translate(-50%, 0) translate(${currentX}px, ${currentY}px)`);
       this.element.style('font-size', `${currentSize}px`);
     } else {
       this.done = true;

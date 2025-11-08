@@ -28,6 +28,14 @@
     canvas {
       display: block;
     }
+
+    /* --- Utility Classes --- */
+    .is-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transition: opacity 0.4s ease-out;
+    }
+
     #ui-container {
       position: absolute;
       top: 0;
@@ -54,7 +62,7 @@
       border: 2px solid #fff;
       border-radius: 50px;
       cursor: pointer;
-      transition: background-color 0.3s, transform 0.3s;
+      transition: all 0.4s ease-out;
       z-index: 10;
       user-select: none;
       -webkit-user-select: none;
@@ -91,9 +99,141 @@
       font-size: 22px;
       font-weight: bold;
       color: #fff;
-      animation: breathing-glow 2.5s ease-in-out infinite;
+      /* This animation is now handled by the group container */
       white-space: nowrap;
       transform: translate(-50%, -50%); /* 关键：实现真正的水平和垂直居中 */
+    }
+
+    /* --- Hall of Fame Group Styles -- */
+    .hof-group-container {
+      position: absolute;
+      transform: translate(-50%, 0);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: breathing-glow 3s ease-in-out infinite;
+      padding: 5px;
+    }
+
+    .hof-group-label {
+      font-size: 16px;
+      font-weight: bold;
+      color: #a8d8ff;
+      margin-bottom: 8px;
+    }
+
+    .hof-members-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hof-group-member {
+      font-size: 22px;
+      font-weight: bold;
+      color: #fff;
+      line-height: 1.2;
+      animation: breathing-glow-soft 3s ease-in-out infinite;
+      margin-bottom: 8px; /* Add space between members in a group */
+    }
+
+    .hof-group-member:last-child {
+      margin-bottom: 0;
+    }
+
+    .hof-name {
+      display: block;
+    }
+
+    .hof-id {
+      display: block;
+      font-size: 0.5em;
+      opacity: 0.7;
+      line-height: 1;
+    }
+
+    /* --- Sidebar Group Styles --- */
+    .sidebar-group-container {
+      border: 1px solid rgba(80, 150, 255, 0.2);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      padding: 8px;
+      background-color: rgba(80, 150, 255, 0.05);
+    }
+
+    .sidebar-group-label {
+      font-weight: bold;
+      color: #a8d8ff;
+      margin-bottom: 5px;
+      font-size: 0.9em;
+      text-align: center;
+    }
+
+    #sidebar-namelist ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+
+    #sidebar-namelist .sidebar-group-container li {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-left: 15px;
+    }
+    
+    #sidebar-namelist .sidebar-group-container li:last-child {
+        border-bottom: none;
+    }
+
+    /* --- Group Mode Switcher Styles --- */
+    #group-mode-switcher {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -70%); /* Move it up a bit */
+      width: 480px; /* Doubled size again */
+      height: 400px; /* Doubled size again */
+      cursor: pointer;
+      z-index: 102;
+      transform-style: preserve-3d;
+      transition: all 0.4s ease-out;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #group-mode-switcher:hover {
+        transform: translate(-50%, -70%) scale(1.1);
+    }
+
+    #group-mode-label {
+        position: absolute;
+        bottom: 30px; /* Increased space for new container size */
+        color: #fff;
+        font-size: 20px; /* Slightly larger font */
+        font-weight: bold;
+        text-shadow: 0 0 8px #fff, 0 0 12px #00aaff;
+        animation: breathing-glow-soft 3s ease-in-out infinite;
+        transition: opacity 0.3s ease-out;
+    }
+
+    .glowing-star {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #fff, 0 0 12px #00aaff;
+      animation: star-breathing 3s ease-in-out infinite, float-staggered 12s ease-in-out infinite;
+      transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .star-connector {
+        position: absolute;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(173, 216, 230, 0), rgba(173, 216, 230, 0.8), rgba(173, 216, 230, 0));
+        transform-origin: left center;
+        animation: connector-breathing 3s ease-in-out infinite;
+        transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        opacity: 0;
     }
 
     @keyframes breathing-glow {
@@ -102,6 +242,15 @@
       }
       50% {
         text-shadow: 0 0 25px #fff, 0 0 40px #00aaff, 0 0 70px #00aaff;
+      }
+    }
+
+    @keyframes breathing-glow-soft {
+      0%, 100% {
+        text-shadow: 0 0 8px #fff, 0 0 12px #00aaff;
+      }
+      50% {
+        text-shadow: 0 0 12px #fff, 0 0 20px #00aaff, 0 0 35px #00aaff;
       }
     }
 
@@ -127,6 +276,26 @@
       50% {
         text-shadow: 0 0 5px rgba(220, 230, 255, 0.9);
       }
+    }
+
+    @keyframes star-breathing {
+        0%, 100% { box-shadow: 0 0 8px #fff, 0 0 12px #00aaff; }
+        50% { box-shadow: 0 0 12px #fff, 0 0 20px #00aaff, 0 0 35px #00aaff; }
+    }
+
+    @keyframes float-staggered {
+      0%   { transform: translate(0px, 0px); }
+      20%  { transform: translate(5px, -3px); }
+      40%  { transform: translate(-4px, 4px); }
+      60%  { transform: translate(3px, 6px); }
+      80%  { transform: translate(-2px, -5px); }
+      100% { transform: translate(0px, 0px); }
+    }
+
+
+    @keyframes connector-breathing {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 0.9; }
     }
 
     /* --- Sidebar Styles --- */
@@ -164,8 +333,8 @@
     #sidebar {
       position: fixed;
       top: 0;
-      left: -282px; /* Fully hidden */
-      width: 250px;
+      left: -292px; /* Fully hidden */
+      width: 260px;
       height: 100%;
       background: linear-gradient(160deg, #020308, #0d061c, #23103a, #0d061c, #020308);
       background-size: 400% 400%;
@@ -188,7 +357,7 @@
     }
     
     #sidebar.is-open + #sidebar-trigger {
-        left: 281px;
+        left: 260px;
     }
 
     #sidebar h3 {
@@ -313,13 +482,19 @@
     }
 
     /* Toast Notification Styles */
-    .toast-notification {
+    #toast-container {
       position: fixed;
-      bottom: 20%; /* Animation: initial state (start slightly lower) */
+      bottom: 22%;
       left: 50%;
-      transform: translateX(-50%); /* Static centering, not part of the animation */
+      transform: translateX(-50%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast-notification {
       opacity: 0;
-
       background-color: #2e7d32; 
       color: white;
       padding: 12px 20px;
@@ -327,13 +502,13 @@
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
       display: flex;
       align-items: center;
-      z-index: 2000;
-      transition: bottom 0.4s ease-out, opacity 0.4s ease-out;
+      transition: all 0.4s ease-out;
+      transform: translateY(20px);
     }
 
     .toast-notification.visible {
-      bottom: 25%; /* Animation: final state (move up to final position) */
       opacity: 1;
+      transform: translateY(0);
     }
 
     .toast-icon {
@@ -359,15 +534,22 @@
 
   <main id="canvas-container"></main>
   <div id="ui-container">
+    <div id="group-mode-switcher" aria-label="切换分组模式">
+      <div id="group-mode-label"></div>
+    </div>
     <button id="startButton">开始点名</button>
   </div>
 
   <div id="hall-of-fame"></div>
 
   <div class="copyright-notice">
-    <p>星空点名器 v1.0 (<a href="LICENSE" style="color: inherit; text-decoration: none;">MIT Licensed</a>)</p>
+    <p>星空点名器 v1.1 (<a href="LICENSE" style="color: inherit; text-decoration: none;">MIT Licensed</a>)</p>
     <p>版权所有 © 2025 南昌大学计算机系 黎鹰</p>
   </div>
+
+  <div id="toast-container"></div>
+
+
 
   <div id="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px);">
     <div id="modal-content" style="background: linear-gradient(145deg, #1a1a2e, #16213e); padding: 30px 40px; border-radius: 15px; text-align: center; color: #e0e0e0; border: 1px solid rgba(137, 207, 240, 0.3); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);">
